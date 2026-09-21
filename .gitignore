@@ -13,6 +13,9 @@ output/
 outputs/
 temp_uploads/
 logs/
+build/
+dist/
+*.exe
 models/*.pth
 models/*.onnx
 models/*.engine
