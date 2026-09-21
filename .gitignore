@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Project artifacts
+input/
+output/
+outputs/
+temp_uploads/
+logs/
+models/*.pth
+models/*.onnx
+models/*.engine
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
