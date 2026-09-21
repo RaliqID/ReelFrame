@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "ReelFrame",
+    "slug": "reelframe",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#070a12",
+    "splash": {
+      "backgroundColor": "#070a12"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.raliqbm3.reelframe",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "ReelFrame needs access to your Camera Roll to upload videos/photos for upscaling and save the 4K output.",
+        "NSPhotoLibraryAddUsageDescription": "ReelFrame saves your upscaled 4K output to your Camera Roll."
+      }
+    },
+    "android": {
+      "package": "com.raliqbm3.reelframe",
+      "permissions": ["READ_MEDIA_VIDEO", "READ_MEDIA_IMAGES", "WRITE_EXTERNAL_STORAGE"]
+    },
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow ReelFrame to access your photos and videos.",
+          "savePhotosPermission": "Allow ReelFrame to save upscaled 4K files to your Photos."
+        }
+      ]
+    ]
+  }
+}

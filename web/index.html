@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReelFrame — Local 4K AI Video & Image Upscaler</title>
+  <style>
+    :root {
+      --bg: #070a12;
+      --card-bg: rgba(15, 22, 36, 0.85);
+      --card-border: rgba(255, 255, 255, 0.09);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --accent: #10b981;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    .nav-header {
+      width: 100%;
+      background: rgba(10, 15, 28, 0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 0 2rem;
+    }
+
+    .nav-container {
+      max-width: 1020px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 70px;
+    }
+
+    .brand h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.03em;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .nav-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      border-radius: 0.5rem;
+      transition: all 0.2s;
+    }
+    .nav-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+    .nav-tab.active { color: #fff; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.5); }
+
+    .container {
+      width: 100%;
+      max-width: 1020px;
+      padding: 2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      flex: 1;
+    }
+
+    .tab-content { display: none; animation: fadeIn 0.3s ease; }
+    .tab-content.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 1.2rem;
+      padding: 1.75rem;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Upscale Tab specific */
+    .dropzone {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 1rem;
+      padding: 3rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.02);
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.08);
+    }
+    .dropzone svg { width: 52px; height: 52px; stroke: var(--primary); margin-bottom: 0.75rem; }
+    .dropzone h3 { font-size: 1.25rem; margin-bottom: 0.35rem; font-weight: 700; }
+    .dropzone p { color: var(--text-muted); font-size: 0.9rem; }
+    
+    .file-preview {
+      display: none;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: rgba(0,0,0,0.4);
+      border-radius: 0.75rem;
+      border: 1px solid var(--card-border);
+      text-align: left;
+    }
+    .file-preview img {
+      max-width: 100px; max-height: 100px; border-radius: 0.5rem;
+      object-fit: cover; float: left; margin-right: 1rem;
+    }
+    .file-meta { overflow: hidden; }
+    .file-meta h4 { margin-bottom: 0.25rem; font-size: 1rem; }
+    .file-meta p { font-size: 0.85rem; color: #cbd5e1; font-family: var(--font-mono); margin-bottom: 0.15rem; }
+
+    /* Preset Cards */
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .preset-card {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--card-border);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .preset-card:hover { border-color: #818cf8; background: rgba(99, 102, 241, 0.1); }
+    .preset-card.active { border-color: var(--primary); background: rgba(99, 102, 241, 0.2); box-shadow: 0 0 15px rgba(99, 102, 241, 0.3); }
+    .preset-card h4 { font-size: 1rem; margin-bottom: 0.25rem; color: #fff; }
+    .preset-card p { font-size: 0.8rem; color: var(--text-muted); }
+
+    .btn-start {
+      width: 100%;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      border: none; color: white; font-weight: 700; font-size: 1.05rem;
+      padding: 1rem; border-radius: 0.75rem; cursor: pointer;
+      margin-top: 1.75rem; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+      transition: all 0.2s ease; display: flex; justify-content: center; align-items: center; gap: 0.6rem;
+    }
+    .btn-start:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6); }
+    .btn-start:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+    /* Terminal */
+    .terminal-box {
+      background: #030712; border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 0.6rem; padding: 0.85rem 1.1rem; font-family: var(--font-mono);
+      font-size: 0.825rem; color: #94a3b8; max-height: 180px; overflow-y: auto;
+      white-space: pre-wrap; margin-top: 0.5rem;
+    }
+    .t-info { color: #3b82f6; }
+    .t-done { color: #10b981; }
+    .t-error { color: #ef4444; }
+    .t-warn { color: #f59e0b; }
+
+    /* Tables for Queue and History */
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--card-border); font-size: 0.9rem; }
+    th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em; }
+    td { color: #e2e8f0; }
+    .action-btn { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.35rem 0.75rem; border-radius: 0.4rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.2s; }
+    .action-btn:hover { background: #ef4444; color: #fff; }
+    .download-btn { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.35rem 0.75rem; border-radius: 0.4rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.2s; text-decoration: none; display: inline-block; }
+    .download-btn:hover { background: #10b981; color: #fff; }
+
+    /* Settings Tab */
+    .settings-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--card-border); }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-info h4 { font-size: 1rem; margin-bottom: 0.25rem; }
+    .settings-info p { font-size: 0.85rem; color: var(--text-muted); }
+    .settings-control select, .settings-control input { background: rgba(0,0,0,0.4); border: 1px solid var(--card-border); color: var(--text); padding: 0.5rem 0.75rem; border-radius: 0.4rem; outline: none; }
+    .gpu-badge { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.5rem 1rem; border-radius: 0.5rem; color: #34d399; font-family: var(--font-mono); font-size: 0.85rem; }
+
+    footer { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: auto; padding: 2rem 0; }
+    footer a { color: #818cf8; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div class="nav-header">
+    <div class="nav-container">
+      <div class="brand"><h1>🎬 ReelFrame</h1></div>
+      <div class="nav-tabs">
+        <button class="nav-tab active" onclick="switchTab('upscale')">Upscale</button>
+        <button class="nav-tab" onclick="switchTab('queue'); loadQueue();">Queue</button>
+        <button class="nav-tab" onclick="switchTab('history'); loadHistory();">History</button>
+        <button class="nav-tab" onclick="switchTab('settings'); loadSettings();">Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    
+    <!-- UPSER TAB -->
+    <div id="tab-upscale" class="tab-content active">
+      <div class="card">
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          <h3 id="file-title">Drop files or folder here</h3>
+          <p id="file-subtitle">Fast 4K Upscale with Real-ESRGAN & NVENC &bull; Press Ctrl+O to Browse</p>
+          <input type="file" id="file-input" style="display: none;" multiple webkitdirectory directory onchange="handleFileSelected(event)">
+        </div>
+
+        <div class="file-preview" id="file-preview">
+          <img id="preview-img" src="" alt="preview" style="display:none;">
+          <div class="file-meta" id="file-meta-content">
+            <h4 id="meta-filename">filename.mp4</h4>
+            <p id="meta-info">Loading metadata...</p>
+          </div>
+        </div>
+
+        <div class="preset-grid">
+          <div class="preset-card active" onclick="selectPreset('reels-4k', this)">
+            <h4>Reels 4K</h4>
+            <p>Vertical 9:16 optimized</p>
+          </div>
+          <div class="preset-card" onclick="selectPreset('cinema-4k', this)">
+            <h4>Cinema 4K</h4>
+            <p>16:9 Standard High Quality</p>
+          </div>
+          <div class="preset-card" onclick="selectPreset('photo-crisp', this)">
+            <h4>Photo Sharp</h4>
+            <p>Crisp Portrait details</p>
+          </div>
+          <div class="preset-card" onclick="selectPreset('anime', this)">
+            <h4>Anime / 2D</h4>
+            <p>Clean lines, denoise</p>
+          </div>
+        </div>
+
+        <button class="btn-start" id="btn-start" onclick="startBatchUpscale()" disabled>
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Select File to Start Upscaling
+        </button>
+
+        <div id="progress-container" style="display: none; margin-top: 1.5rem;">
+          <div style="width: 100%; height: 14px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; margin-bottom: 0.5rem;">
+            <div id="progress-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #6366f1, #a855f7, #10b981); transition: width 0.25s ease;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);">
+            <span id="metric-frames">Frame: 0 / 0</span>
+            <span id="metric-pct">0.0%</span>
+            <span id="metric-eta">ETA: --</span>
+          </div>
+          <div class="terminal-box" id="terminal-box">Ready.</div>
+          <a id="btn-download" class="download-btn" style="margin-top: 1rem; display:none;" href="" download>Download Result</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUEUE TAB -->
+    <div id="tab-queue" class="tab-content">
+      <div class="card">
+        <h3>Running & Queued Jobs</h3>
+        <table id="queue-table">
+          <thead>
+            <tr><th>File</th><th>Status</th><th>Progress</th><th>Action</th></tr>
+          </thead>
+          <tbody><tr><td colspan="4">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="tab-history" class="tab-content">
+      <div class="card">
+        <h3>Completed Jobs</h3>
+        <table id="history-table">
+          <thead>
+            <tr><th>File</th><th>Resolution</th><th>Time</th><th>Action</th></tr>
+          </thead>
+          <tbody><tr><td colspan="4">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SETTINGS TAB -->
+    <div id="tab-settings" class="tab-content">
+      <div class="card">
+        <h3>System Settings</h3>
+        
+        <div class="settings-row">
+          <div class="settings-info">
+            <h4>GPU Status</h4>
+            <p>Active hardware acceleration</p>
+          </div>
+          <div class="settings-control gpu-badge" id="gpu-info">Detecting...</div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-info">
+            <h4>Tile Size Override</h4>
+            <p>Lower tile size uses less VRAM but is slower. Default 512.</p>
+          </div>
+          <div class="settings-control">
+            <select id="setting-tile" onchange="saveSettings()">
+              <option value="512">512px (4GB VRAM Safe)</option>
+              <option value="400">400px (Conservative)</option>
+              <option value="0">0 (Full Frame - 8GB+)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-info">
+            <h4>Default Output Folder</h4>
+            <p>Local storage preference for downloaded files</p>
+          </div>
+          <div class="settings-control">
+            <input type="text" id="setting-folder" placeholder="Downloads" onchange="saveSettings()">
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <footer>
+      <strong>ReelFrame</strong> &bull; Local AI Super-Resolution by <a href="https://github.com/kouji999/ReelFrame" target="_blank">Raliq Hidayat BM3</a>
+    </footer>
+  </div>
+
+  <script>
+    let selectedFiles = [];
+    let activePreset = 'reels-4k';
+    let pollInterval = null;
+    let activeJobId = null;
+
+    // Hotkey
+    document.addEventListener('keydown', function(e) {
+      if (e.ctrlKey && e.key === 'o') {
+        e.preventDefault();
+        document.getElementById('file-input').click();
+      }
+    });
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + tabId).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    function selectPreset(preset, el) {
+      activePreset = preset;
+      document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function formatBytes(bytes, decimals = 2) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024, dm = decimals < 0 ? 0 : decimals, sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    const dropzone = document.getElementById('dropzone');
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault(); dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) {
+        document.getElementById('file-input').files = e.dataTransfer.files;
+        handleFileSelected({ target: { files: e.dataTransfer.files } });
+      }
+    });
+
+    async function handleFileSelected(e) {
+      selectedFiles = Array.from(e.target.files);
+      if (!selectedFiles.length) return;
+
+      const title = document.getElementById('file-title');
+      const subtitle = document.getElementById('file-subtitle');
+      const btn = document.getElementById('btn-start');
+      const preview = document.getElementById('file-preview');
+      
+      if (selectedFiles.length > 1) {
+        title.textContent = `Batch Mode: ${selectedFiles.length} files`;
+        subtitle.textContent = "Ready to queue upscaling";
+        preview.style.display = 'none';
+        btn.textContent = `Start Batch Upscale (${selectedFiles.length} files)`;
+      } else {
+        const file = selectedFiles[0];
+        title.textContent = file.name;
+        subtitle.textContent = `Size: ${formatBytes(file.size)}`;
+        btn.textContent = "Start Upscale";
+        
+        // Show Preview
+        preview.style.display = 'block';
+        document.getElementById('meta-filename').textContent = file.name;
+        document.getElementById('meta-info').textContent = "Probing metadata...";
+        
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            document.getElementById('preview-img').src = e.target.result;
+            document.getElementById('preview-img').style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        } else {
+          document.getElementById('preview-img').style.display = 'none';
+        }
+
+        // Call probe API
+        const fd = new FormData(); fd.append('file', file);
+        try {
+          const res = await fetch('/api/probe', { method: 'POST', body: fd });
+          const data = await res.json();
+          if (data.error) {
+            document.getElementById('meta-info').textContent = "Probe error: " + data.error;
+          } else {
+            let metaText = `${data.width}x${data.height}`;
+            if (data.fps) metaText += ` • ${data.fps} fps`;
+            if (data.duration) metaText += ` • ${data.duration}s`;
+            if (data.has_audio) metaText += ` • 🎵 Audio`;
+            document.getElementById('meta-info').textContent = metaText;
+          }
+        } catch (err) {
+          document.getElementById('meta-info').textContent = "Probe failed.";
+        }
+      }
+      btn.disabled = false;
+    }
+
+    function appendTerminal(text) {
+      const term = document.getElementById('terminal-box');
+      let html = text.replace(/\[info\]/gi, '<span class="t-info">[info]</span>')
+                     .replace(/\[done\]/gi, '<span class="t-done">[done]</span>')
+                     .replace(/\[error\]/gi, '<span class="t-error">[error]</span>')
+                     .replace(/\[warn\]/gi, '<span class="t-warn">[warn]</span>');
+      term.innerHTML = html;
+      term.scrollTop = term.scrollHeight;
+    }
+
+    async function startBatchUpscale() {
+      if (!selectedFiles.length) return;
+      document.getElementById('btn-start').disabled = true;
+      document.getElementById('progress-container').style.display = 'block';
+      document.getElementById('btn-download').style.display = 'none';
+
+      const tile = localStorage.getItem('tileSize') || "512";
+      
+      for (const file of selectedFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Map presets
+        if (activePreset === 'reels-4k') { formData.append('model', 'realesr-general-x4v3.pth'); formData.append('scale', '2x'); formData.append('cq', '19'); }
+        else if (activePreset === 'cinema-4k') { formData.append('model', 'realesr-general-x4v3.pth'); formData.append('scale', '2x'); formData.append('cq', '18'); }
+        else if (activePreset === 'photo-crisp') { formData.append('model', 'RealESRGAN_x4plus.pth'); formData.append('scale', '4x'); formData.append('cq', '16'); }
+        else if (activePreset === 'anime') { formData.append('model', 'RealESRGAN_x4plus_anime_6B.pth'); formData.append('scale', '2x'); formData.append('cq', '20'); }
+        
+        formData.append('tile', tile);
+
+        try {
+          const res = await fetch('/api/upscale', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (data.status === 'started') {
+            activeJobId = data.job_id;
+            await trackJob(data.job_id);
+          }
+        } catch(e) {
+          appendTerminal(`[error] Network error for ${file.name}`);
+        }
+      }
+      document.getElementById('btn-start').disabled = false;
+      document.getElementById('btn-start').textContent = "Batch Complete. Click to clear.";
+    }
+
+    function trackJob(jobId) {
+      return new Promise(resolve => {
+        const timer = setInterval(async () => {
+          try {
+            const res = await fetch(`/api/job/${jobId}`);
+            const job = await res.json();
+            
+            if (job.progress) {
+              document.getElementById('progress-bar').style.width = `${job.progress}%`;
+              document.getElementById('metric-pct').textContent = `${job.progress.toFixed(1)}%`;
+              document.getElementById('metric-frames').textContent = `Frame: ${job.current_frame || 0} / ${job.total_frames || '?'}`;
+              document.getElementById('metric-eta').textContent = `ETA: ${job.eta ? Math.round(job.eta)+'s' : '--'}`;
+            }
+            if (job.log) appendTerminal(job.log);
+
+            if (job.status === 'completed') {
+              clearInterval(timer);
+              const dlBtn = document.getElementById('btn-download');
+              dlBtn.style.display = 'inline-block';
+              dlBtn.href = `/api/download/${jobId}`;
+              dlBtn.textContent = `Download ${job.output_filename}`;
+              resolve();
+            } else if (job.status === 'error' || job.status === 'cancelled') {
+              clearInterval(timer);
+              resolve();
+            }
+          } catch(e) { console.error(e); }
+        }, 800);
+      });
+    }
+
+    async function loadQueue() {
+      const tbody = document.querySelector('#queue-table tbody');
+      tbody.innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+      try {
+        const res = await fetch('/api/jobs');
+        const jobs = await res.json();
+        let html = '';
+        for (const [id, job] of Object.entries(jobs)) {
+          if (job.status === 'completed' || job.status === 'error' || job.status === 'cancelled') continue;
+          html += `<tr>
+            <td>${job.input_filename}</td>
+            <td>${job.status}</td>
+            <td>${job.progress.toFixed(1)}%</td>
+            <td><button class="action-btn" onclick="cancelJob('${id}')">Cancel</button></td>
+          </tr>`;
+        }
+        tbody.innerHTML = html || '<tr><td colspan="4">No active jobs</td></tr>';
+      } catch(e) { tbody.innerHTML = '<tr><td colspan="4">Error loading queue</td></tr>'; }
+    }
+
+    async function cancelJob(id) {
+      await fetch(`/api/job/${id}`, { method: 'DELETE' });
+      loadQueue();
+    }
+
+    async function loadHistory() {
+      const tbody = document.querySelector('#history-table tbody');
+      tbody.innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+      try {
+        const res = await fetch('/api/history');
+        const history = await res.json();
+        let html = '';
+        history.reverse().forEach(item => {
+          const date = new Date(item.timestamp * 1000).toLocaleString();
+          let action = item.status === 'completed' ? `<a href="/api/download/${item.job_id}" class="download-btn">Download</a>` : item.status;
+          html += `<tr>
+            <td>${item.output_filename}</td>
+            <td>${item.resolution || '4K'}</td>
+            <td>${date}</td>
+            <td>${action}</td>
+          </tr>`;
+        });
+        tbody.innerHTML = html || '<tr><td colspan="4">No history</td></tr>';
+      } catch(e) { tbody.innerHTML = '<tr><td colspan="4">Error loading history</td></tr>'; }
+    }
+
+    async function loadSettings() {
+      const tile = localStorage.getItem('tileSize');
+      if (tile) document.getElementById('setting-tile').value = tile;
+      const folder = localStorage.getItem('defaultFolder');
+      if (folder) document.getElementById('setting-folder').value = folder;
+
+      try {
+        const res = await fetch('/api/gpu-info');
+        const gpu = await res.json();
+        if (gpu.error) {
+          document.getElementById('gpu-info').textContent = gpu.error;
+        } else {
+          const used = (gpu.vram_used / (1024*1024*1024)).toFixed(1);
+          const total = (gpu.vram_total / (1024*1024*1024)).toFixed(1);
+          document.getElementById('gpu-info').textContent = `${gpu.name} (${used}GB / ${total}GB Used)`;
+        }
+      } catch(e) {
+        document.getElementById('gpu-info').textContent = 'Error fetching GPU info';
+      }
+    }
+
+    function saveSettings() {
+      localStorage.setItem('tileSize', document.getElementById('setting-tile').value);
+      localStorage.setItem('defaultFolder', document.getElementById('setting-folder').value);
+    }
+    
+    // Init settings
+    if (!localStorage.getItem('tileSize')) localStorage.setItem('tileSize', '512');
+  </script>
+</body>
+</html>

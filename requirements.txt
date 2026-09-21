@@ -1,0 +1,20 @@
+# Core ML & Processing
+spandrel>=0.4.2
+numpy>=2.0
+opencv-python-headless>=4.10
+facexlib>=0.3.0
+pillow>=10.0.0
+tqdm>=4.66.0
+requests>=2.31.0
+
+# Web GUI & API
+fastapi>=0.110.0
+uvicorn>=0.28.0
+python-multipart>=0.0.9
+
+# NOTE: PyTorch must be installed separately with CUDA support.
+# Don't `pip install -r requirements.txt` for torch — use the command
+# in the README for your CUDA version (cu124 / cu126 / cpu).
+#
+# Example (CUDA 12.4):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
