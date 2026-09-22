@@ -129,44 +129,57 @@ bash run_app.sh  # native window (pywebview)
 
 ---
 
-## 📦 Build an Installable App (Windows / macOS / Linux)
+## 📦 Get the App (Windows / macOS / Linux)
 
-Turn ReelFrame into a real double-click application.
+> **Important:** `.app` and `.dmg` **cannot be built on Windows** — PyInstaller does not
+> cross-compile. Each OS builds on its own machine. Use one of the two ways below.
 
-### Windows — installer `.exe`
+### ✅ Option A — Download a prebuilt app from GitHub (no Mac needed)
+
+The repo includes a **cloud build** (`.github/workflows/build-apps.yml`) that compiles
+Windows, macOS and Linux apps automatically:
+
+1. Push a version tag to trigger it:
+   ```bash
+   git tag v2.0.0
+   git push origin v2.0.0
+   ```
+   *(or go to **Actions → Build Apps → Run workflow** and run it manually)*
+2. When it finishes, download from either:
+   - the run's **Artifacts** section, or
+   - the **Releases** page (when triggered by a tag)
+3. You get:
+   | OS | File | How to use |
+   |---|---|---|
+   | **Windows** | `ReelFrame-Setup-2.0.0.exe` | double-click to install |
+   | **macOS** | `ReelFrame-2.0.0-macos.dmg` | open → drag **ReelFrame** into Applications |
+   | **Linux** | `ReelFrame-2.0.0-x86_64.AppImage` | `chmod +x` then double-click |
+
+> macOS note: the app is unsigned, so the first launch needs **right-click → Open**
+> (or System Settings → Privacy & Security → Open Anyway).
+
+### Option B — Build on your own machine
+
+**Windows**
 ```batch
 build_windows_installer.bat
 ```
-Produces:
-- `dist\ReelFrame\ReelFrame.exe` — portable app (run directly)
-- `installer\output\ReelFrame-Setup-2.0.0.exe` — **installer** (Start Menu + Desktop shortcut + uninstaller)
+→ `installer\output\ReelFrame-Setup-2.0.0.exe` (installer) and `dist\ReelFrame\ReelFrame.exe` (portable)
 
-> Requires [Inno Setup](https://jrsoftware.org/isdl.php): `winget install JRSoftware.InnoSetup`
-
-### macOS — `ReelFrame.app`
+**macOS** (run on a Mac)
 ```bash
 bash build_macos.sh
 ```
-Produces `dist/ReelFrame.app` — drag it into `/Applications`.
-(First launch: right-click → **Open** to allow an unsigned app.)
+→ `dist/ReelFrame.app` — drag into `/Applications`
 
-### Linux — bundle (+ optional AppImage)
+**Linux** (run on Linux)
 ```bash
 bash build_linux.sh
 ```
-Produces `dist/ReelFrame/ReelFrame`. See the AppImage section inside the script to
-package it as a single `.AppImage` file.
+→ `dist/ReelFrame/ReelFrame` (bundle; the script also shows how to make an `.AppImage`)
 
-> Each platform builds on its **own OS** (PyInstaller does not cross-compile).
-> The build scripts auto-install the platform's webview backend (WebView2 / Cocoa / GTK).
-
-### iOS companion
-```bash
-cd ios-app
-npm install
-npx expo start     # scan the QR with Expo Go on your iPhone
-```
-See [IOS_COMPANION.md](IOS_COMPANION.md).
+> Just want to *run* it without building? Use `run_app.bat` / `bash run_app.sh`
+> (or `run_gui.*` for the browser dashboard) — see Quick Start above.
 
 ---
 
