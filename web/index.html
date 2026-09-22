@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ReelFrame — Local 4K AI Video & Image Upscaler</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236366f1'/%3E%3Cpath d='M22 30h56v12H22zM22 50h40v12H22zM22 70h28v12H22z' fill='%23fff'/%3E%3C/svg%3E">
   <style>
     :root {
       --bg: #070a12;
@@ -338,6 +339,18 @@
       font-size: 0.8rem; font-weight: 600;
     }
 
+    /* Compact inline progress for the Queue table */
+    .mini-bar {
+      width: 100%; height: 6px; background: rgba(255,255,255,0.08);
+      border-radius: 9999px; overflow: hidden; margin-bottom: 0.3rem;
+    }
+    .mini-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #6366f1, #10b981);
+      border-radius: 9999px; transition: width 0.4s ease;
+    }
+    .mini-label { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+
     .download-btn {
       background: rgba(16, 185, 129, 0.15); color: #10b981;
       border: 1px solid rgba(16, 185, 129, 0.3);
@@ -365,6 +378,32 @@
       padding: 2rem 0; margin-top: auto;
     }
     footer a { color: #818cf8; text-decoration: none; font-weight: 600; }
+
+    /* Responsive: stack nav on narrow screens so tabs never collide with the brand */
+    @media (max-width: 640px) {
+      .nav-container {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+        padding: 0.85rem 1rem;
+      }
+      .brand h1 { font-size: 1.25rem; text-align: center; }
+      .nav-tabs {
+        width: 100%;
+        overflow-x: auto;
+        justify-content: center;
+        -webkit-overflow-scrolling: touch;
+      }
+      .nav-tab { padding: 0.45rem 0.75rem; font-size: 0.8rem; white-space: nowrap; }
+      .container { margin: 1.25rem auto; padding: 0 1rem; }
+      .card { padding: 1.25rem; border-radius: 1rem; }
+      .dropzone { padding: 2rem 1rem; }
+      .file-preview-content { flex-direction: column; align-items: flex-start; }
+      .settings-row { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+      .settings-control { width: 100%; }
+      .settings-control select { width: 100%; }
+      .gpu-badge { width: 100%; text-align: center; }
+    }
   </style>
 </head>
 <body>
@@ -373,10 +412,10 @@
     <div class="nav-container">
       <div class="brand"><h1>🎬 ReelFrame</h1></div>
       <div class="nav-tabs">
-        <button class="nav-tab active" onclick="switchTab('upscale')">Upscale</button>
-        <button class="nav-tab" onclick="switchTab('queue'); loadQueue();">Queue</button>
-        <button class="nav-tab" onclick="switchTab('history'); loadHistory();">History</button>
-        <button class="nav-tab" onclick="switchTab('settings'); loadSettings();">Settings</button>
+        <button class="nav-tab active" onclick="switchTab('upscale', event)">Upscale</button>
+        <button class="nav-tab" onclick="switchTab('queue', event); loadQueue();">Queue</button>
+        <button class="nav-tab" onclick="switchTab('history', event); loadHistory();">History</button>
+        <button class="nav-tab" onclick="switchTab('settings', event); loadSettings();">Settings</button>
       </div>
     </div>
   </div>
@@ -417,7 +456,7 @@
         <div class="settings-grid">
           <div class="form-group">
             <label>AI Enhancement Mode</label>
-            <select id="model-select">
+            <select id="model-select" onchange="recalculateTargetBadge()">
               <option value="realesr-general-x4v3.pth">General Video & Photo (Fast & Crisp) — Recommended</option>
               <option value="RealESRGAN_x4plus.pth">Ultra Photo & Textures (RRDBNet High Detail)</option>
               <option value="RealESRGAN_x4plus_anime_6B.pth">Anime, Cartoons & 2D Illustrations</option>
@@ -428,8 +467,11 @@
           <div class="form-group">
             <label>Resolution Scale</label>
             <select id="scale-select" onchange="recalculateTargetBadge()">
-              <option value="2x">2x Upscale (Default — e.g. 1080p &rarr; 4K)</option>
-              <option value="4x">4x Upscale (Maximum Clarity — e.g. 720p &rarr; 4K)</option>
+              <option value="4k" selected>→ 4K UHD (Auto-adapt any input · recommended)</option>
+              <option value="2k">→ 2K QHD (2560px longest edge)</option>
+              <option value="1080p">→ 1080p (1920px longest edge)</option>
+              <option value="2x">2× Multiplier (e.g. 1080p &rarr; 2160p)</option>
+              <option value="4x">4× Multiplier (maximum, e.g. 720p &rarr; 2880p)</option>
             </select>
           </div>
 
@@ -445,9 +487,19 @@
           <div class="form-group">
             <label>VRAM Guard (RTX 3050)</label>
             <select id="tile-select">
-              <option value="512">512px Tiling (Safe for 4GB VRAM)</option>
-              <option value="400">400px Tiling (Ultra Low Memory)</option>
-              <option value="0">Disabled (Full Frame 8GB+ VRAM)</option>
+              <option value="-1" selected>Auto (Recommended — fastest &amp; safe)</option>
+              <option value="1024">1024px Tiling (Low VRAM)</option>
+              <option value="512">512px Tiling (Very Low VRAM)</option>
+              <option value="0">Disabled (Full Frame — 8GB+ VRAM)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Compression Cleanup</label>
+            <select id="denoise-select">
+              <option value="auto" selected>Auto (Clean artifacts if detected)</option>
+              <option value="1.0">On — Deblock compressed sources</option>
+              <option value="0">Off — Source is already clean</option>
             </select>
           </div>
         </div>
@@ -476,7 +528,7 @@
           <h3>🎉 Upscaling Complete!</h3>
           <p id="result-info" style="color: var(--text-muted); font-size: 0.9rem;">Your upscaled master is ready.</p>
           <a id="btn-download" class="btn-download" href="#" download>
-            ⬇️ Download Upscaled Master
+            ⬇️ Download Upscaled Master (.zip)
           </a>
         </div>
 
@@ -487,11 +539,14 @@
     <div id="tab-queue" class="tab-content">
       <div class="card">
         <h3>Active Processing Queue</h3>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.35rem;">
+          Live view — updates every second. Jobs run one at a time so each gets the full GPU.
+        </p>
         <table id="queue-table">
           <thead>
-            <tr><th>File</th><th>Status</th><th>Progress</th><th>Action</th></tr>
+            <tr><th>File</th><th>Status</th><th>Progress</th><th>Output</th><th>Action</th></tr>
           </thead>
-          <tbody><tr><td colspan="4">No active jobs in queue.</td></tr></tbody>
+          <tbody><tr><td colspan="5">No active jobs in queue.</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -500,6 +555,10 @@
     <div id="tab-history" class="tab-content">
       <div class="card">
         <h3>Processing History</h3>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.35rem;">
+          Each download saves a <strong>.zip</strong> to your Downloads folder — it contains your
+          upscaled file in its original format (video stays video, photo stays photo).
+        </p>
         <table id="history-table">
           <thead>
             <tr><th>File</th><th>Status</th><th>Time</th><th>Action</th></tr>
@@ -548,6 +607,8 @@
     let activeJobId = null;
     let currentSourceWidth = 0;
     let currentSourceHeight = 0;
+    let queuePollTimer = null;      // realtime queue refresh
+    let historyPollTimer = null;    // realtime history refresh
 
     // Hotkey Ctrl+O
     document.addEventListener('keydown', function(e) {
@@ -557,11 +618,52 @@
       }
     });
 
-    function switchTab(tabId) {
+    function switchTab(tabId, evt) {
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + tabId).classList.add('active');
-      event.target.classList.add('active');
+      const src = (evt && evt.target) || window.event?.target;
+      if (src && src.classList) src.classList.add('active');
+
+      // Realtime refresh only while the relevant tab is visible.
+      stopPolling(queuePollTimer); queuePollTimer = null;
+      stopPolling(historyPollTimer); historyPollTimer = null;
+      if (tabId === 'queue') {
+        loadQueue();
+        queuePollTimer = setInterval(loadQueue, 1000);
+      } else if (tabId === 'history') {
+        loadHistory();
+        historyPollTimer = setInterval(loadHistory, 3000);
+      }
+    }
+
+    function stopPolling(t) { if (t) clearInterval(t); }
+
+    // Escape untrusted strings (filenames come from user uploads) before
+    // interpolating them into innerHTML — prevents stored XSS.
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
+    }
+
+    // Human-readable timestamp from epoch seconds/millis.
+    function formatTime(ts) {
+      if (!ts) return '--';
+      let ms = Number(ts);
+      if (!isFinite(ms)) return '--';
+      if (ms < 1e12) ms *= 1000;               // seconds -> millis
+      const d = new Date(ms);
+      if (isNaN(d.getTime())) return '--';
+      const now = Date.now();
+      const diff = Math.round((now - ms) / 1000);
+      if (diff >= 0 && diff < 60) return `${diff}s ago`;
+      if (diff >= 60 && diff < 3600) return `${Math.round(diff / 60)}m ago`;
+      if (diff >= 3600 && diff < 86400) return `${Math.round(diff / 3600)}h ago`;
+      return d.toLocaleString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
     }
 
     function formatBytes(bytes, decimals = 2) {
@@ -592,11 +694,47 @@
 
     function recalculateTargetBadge() {
       if (!currentSourceWidth || !currentSourceHeight) return;
-      const scaleStr = document.getElementById('scale-select').value;
-      const factor = scaleStr === '4x' ? 4 : 2;
-      const targetW = currentSourceWidth * factor;
-      const targetH = currentSourceHeight * factor;
-      document.getElementById('badge-target').textContent = `Target: ${targetW} × ${targetH} (${factor}x Crisp)`;
+      const mode = document.getElementById('scale-select').value;
+      const long = Math.max(currentSourceWidth, currentSourceHeight);
+
+      const TARGETS = { '4k': 3840, '2k': 2560, '1080p': 1920 };
+      // Native SR scale per model file (mirrors MODEL_SCALE_MAP on the backend).
+      const MODEL_SCALE = {
+        'realesr-general-x4v3.pth': 4,
+        'RealESRGAN_x4plus.pth': 4,
+        'RealESRGAN_x4plus_anime_6B.pth': 4,
+        'RealESRGAN_x2plus.pth': 2
+      };
+      const modelSel = document.getElementById('model-select');
+      const modelScale = MODEL_SCALE[modelSel ? modelSel.value : ''] || 4;
+      let tw, th, label;
+
+      if (TARGETS[mode]) {
+        const desired = TARGETS[mode];
+        const srMax = long * modelScale;
+        if (long >= desired) {
+          // Already at/above target: keep source size (net 1x detail pass).
+          tw = currentSourceWidth; th = currentSourceHeight;
+          label = `${mode.toUpperCase()} already met`;
+        } else if (srMax >= desired) {
+          const s = desired / long;
+          tw = Math.round(currentSourceWidth * s);
+          th = Math.round(currentSourceHeight * s);
+          label = mode.toUpperCase() + ' (auto-adapt)';
+        } else {
+          // Model ceiling short of target -> final resize reaches the target.
+          tw = Math.round(currentSourceWidth * (desired / long));
+          th = Math.round(currentSourceHeight * (desired / long));
+          label = mode.toUpperCase() + ' (SR + resize)';
+        }
+      } else {
+        const factor = mode === '4x' ? 4 : 2;
+        tw = currentSourceWidth * factor;
+        th = currentSourceHeight * factor;
+        label = `${factor}× multiplier`;
+      }
+      tw -= tw % 2; th -= th % 2;   // encoders need even dimensions
+      document.getElementById('badge-target').textContent = `Target: ${tw} × ${th} · ${label}`;
     }
 
     const dropzone = document.getElementById('dropzone');
@@ -705,7 +843,10 @@
 
     function appendTerminal(text) {
       const term = document.getElementById('terminal-box');
-      let html = text.replace(/\[info\]/gi, '<span class="t-info">[info]</span>')
+      // Escape first (log text can contain user filenames), then re-inject the
+      // severity tags as safe markup.
+      let html = escapeHtml(text)
+                     .replace(/\[info\]/gi, '<span class="t-info">[info]</span>')
                      .replace(/\[done\]/gi, '<span class="t-done">[done]</span>')
                      .replace(/\[error\]/gi, '<span class="t-error">[error]</span>')
                      .replace(/\[warn\]/gi, '<span class="t-warn">[warn]</span>');
@@ -723,6 +864,7 @@
       const model = document.getElementById('model-select').value;
       const scale = document.getElementById('scale-select').value;
       const cq = document.getElementById('cq-select').value;
+      const denoise = document.getElementById('denoise-select').value;
       
       for (const file of selectedFiles) {
         const formData = new FormData();
@@ -731,14 +873,20 @@
         formData.append('scale', scale);
         formData.append('cq', cq);
         formData.append('tile', tile);
+        formData.append('denoise', denoise);
 
         try {
           const res = await fetch('/api/upscale', { method: 'POST', body: formData });
           const data = await res.json();
-          if (data.status === 'started') {
-            activeJobId = data.job_id;
-            await trackJob(data.job_id);
+          if (!res.ok || !data.job_id) {
+            appendTerminal(`[error] Could not start ${file.name}: ${data.error || res.status}`);
+            continue;
           }
+          activeJobId = data.job_id;
+          if (data.status === 'queued' && data.position > 1) {
+            appendTerminal(`[info] ${file.name} queued (position ${data.position}) — waiting for the current job to finish…`);
+          }
+          await trackJob(data.job_id);
         } catch(e) {
           appendTerminal(`[error] Network error for ${file.name}. Make sure ReelFrame server is running.`);
         }
@@ -749,16 +897,28 @@
 
     function trackJob(jobId) {
       return new Promise(resolve => {
+        let consecutiveErrors = 0;
         const timer = setInterval(async () => {
           try {
             const res = await fetch(`/api/job/${jobId}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const job = await res.json();
-            
-            if (job.progress !== undefined) {
-              document.getElementById('progress-bar').style.width = `${job.progress}%`;
-              document.getElementById('metric-pct').textContent = `${job.progress.toFixed(1)}%`;
-              document.getElementById('metric-frames').textContent = `Frame: ${job.current_frame || 0} / ${job.total_frames || '?'}`;
-              document.getElementById('metric-eta').textContent = `ETA: ${job.eta ? Math.round(job.eta)+'s' : '--'}`;
+            consecutiveErrors = 0;
+
+            // Always render frames/total explicitly (0/0 was the old bug when a
+            // job was still queued) and drive the bar from real progress.
+            const cur = job.current_frame || 0;
+            const tot = job.total_frames || 0;
+            document.getElementById('metric-frames').textContent = `Frame: ${cur} / ${tot > 0 ? tot : '—'}`;
+            if (job.status === 'queued') {
+              document.getElementById('progress-bar').style.width = '2%';
+              document.getElementById('metric-pct').textContent = 'Queued';
+              document.getElementById('metric-eta').textContent = 'ETA: —';
+            } else {
+              const pct = job.progress || 0;
+              document.getElementById('progress-bar').style.width = `${pct}%`;
+              document.getElementById('metric-pct').textContent = `${pct.toFixed(1)}%`;
+              document.getElementById('metric-eta').textContent = `ETA: ${job.eta ? Math.round(job.eta)+'s' : '—'}`;
             }
             if (job.log) appendTerminal(job.log);
 
@@ -767,14 +927,24 @@
               document.getElementById('result-box').style.display = 'block';
               document.getElementById('result-info').textContent = `Master saved: ${job.output_filename}`;
               const dlBtn = document.getElementById('btn-download');
-              dlBtn.href = `/api/download/${jobId}`;
+              dlBtn.href = `/api/download-zip/${jobId}`;
               resolve();
-            } else if (job.status === 'error' || job.status === 'cancelled') {
+            } else if (job.status === 'error') {
               clearInterval(timer);
+              appendTerminal(`[error] Job failed: ${job.error || 'unknown error'}`);
+              resolve();
+            } else if (job.status === 'cancelled') {
+              clearInterval(timer);
+              appendTerminal('[warn] Job cancelled.');
               resolve();
             }
           } catch(e) {
-            // Wait for next poll
+            consecutiveErrors++;
+            if (consecutiveErrors >= 5) {
+              clearInterval(timer);
+              appendTerminal('[error] Lost connection to ReelFrame server. Is it still running?');
+              resolve();
+            }
           }
         }, 800);
       });
@@ -785,21 +955,37 @@
       try {
         const res = await fetch('/api/jobs');
         const jobs = await res.json();
-        const active = Object.values(jobs).filter(j => j.status === 'processing' || j.status === 'queued');
+        const all = Object.values(jobs);
+        const active = all.filter(j => ['processing', 'queued'].includes(j.status));
         if (!active.length) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No active jobs in queue.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No active jobs in queue.</td></tr>';
           return;
         }
-        tbody.innerHTML = active.map(j => `
-          <tr>
-            <td>${j.input_filename}</td>
-            <td><span class="badge ${j.status === 'processing' ? 'badge-target' : ''}">${j.status}</span></td>
-            <td>${j.progress ? j.progress.toFixed(1) + '%' : '0%'}</td>
-            <td><button class="action-btn" onclick="cancelJob('${j.job_id}')">Cancel</button></td>
-          </tr>
-        `).join('');
+        // Sort: running first, then queued in order.
+        active.sort((a, b) => {
+          const rank = s => s === 'processing' ? 0 : 1;
+          return rank(a.status) - rank(b.status) || (a.queued_at || 0) - (b.queued_at || 0);
+        });
+        tbody.innerHTML = active.map(j => {
+          const pct = (j.progress || 0).toFixed(1);
+          const isRun = j.status === 'processing';
+          const detail = isRun
+            ? `${j.current_frame || 0}/${j.total_frames || '?'} frames · ${j.fps ? j.fps.toFixed(2) : '0'} fps`
+            : 'Waiting…';
+          return `
+            <tr>
+              <td title="${escapeHtml(j.input_filename)}">${escapeHtml(j.input_filename)}</td>
+              <td><span class="badge ${isRun ? 'badge-target' : ''}">${escapeHtml(j.status)}</span></td>
+              <td>
+                <div class="mini-bar"><div class="mini-fill" style="width:${pct}%"></div></div>
+                <span class="mini-label">${pct}% · ${escapeHtml(detail)}</span>
+              </td>
+              <td>${escapeHtml(j.output_resolution || (isRun ? '—' : '—'))}</td>
+              <td><button class="action-btn" onclick="cancelJob('${escapeHtml(j.job_id)}')">Cancel</button></td>
+            </tr>`;
+        }).join('');
       } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="4">Could not load queue.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5">Could not load queue.</td></tr>';
       }
     }
 
@@ -819,10 +1005,12 @@
         }
         tbody.innerHTML = hist.slice().reverse().map(h => `
           <tr>
-            <td>${h.output_filename || h.input_filename}</td>
-            <td><span class="badge badge-target">${h.status}</span></td>
-            <td>${h.timestamp || '--'}</td>
-            <td><a class="download-btn" href="/api/download/${h.job_id}" download>Download</a></td>
+            <td>${escapeHtml(h.output_filename || h.input_filename)}</td>
+            <td><span class="badge ${h.status === 'completed' ? 'badge-target' : ''}">${escapeHtml(h.status)}</span></td>
+            <td>${escapeHtml(formatTime(h.timestamp))}</td>
+            <td>${h.status === 'completed'
+                  ? `<a class="download-btn" href="/api/download-zip/${escapeHtml(h.job_id)}" download title="Downloads a .zip containing your upscaled file">⬇ .zip</a>`
+                  : '<span style="color: var(--text-muted);">—</span>'}</td>
           </tr>
         `).join('');
       } catch(e) {

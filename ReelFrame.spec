@@ -1,12 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
-import sys
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+"""PyInstaller spec for ReelFrame (Windows desktop app).
+
+Key points:
+  * console=False  -> no black console window flashes on launch. The app shows
+    a native error dialog + writes logs/reelframe-desktop.log if startup fails,
+    so problems are never silent.
+  * icon           -> brand icon from web/icon.ico.
+  * hiddenimports  -> uvicorn/pywebview/pythonnet/spandrel plugin modules that
+    PyInstaller can't discover by static analysis.
+"""
+from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
 datas = [
-    ('web', 'web'),
-    ('models', 'models'),
+    ('web', 'web'),          # UI + favicon + icon assets
+    ('models', 'models'),    # AI model weights (present at build time)
 ]
 
 hiddenimports = [
@@ -30,8 +39,6 @@ hiddenimports = [
     'pydantic',
     'spandrel',
     'spandrel.architectures',
-    'spandrel.architectures.Compact',
-    'spandrel.architectures.RRDBNet',
     'cv2',
     'torch',
     'torchvision',
@@ -39,7 +46,9 @@ hiddenimports = [
     'tqdm',
     'multipart',
     'requests',
+    'python_multipart',
 ]
+hiddenimports += collect_submodules('spandrel.architectures')
 
 a = Analysis(
     ['desktop_app.py'],
@@ -50,7 +59,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['matplotlib', 'tkinter', 'PyQt5', 'PySide2', 'PySide6'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -69,12 +78,13 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,
+    console=False,                 # windowed app: no console flash
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='web/icon.ico',           # brand icon
 )
 
 coll = COLLECT(

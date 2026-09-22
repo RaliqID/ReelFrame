@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 
 // =============================================================================
 // Types
@@ -59,10 +60,10 @@ function useServerUrl(ip: string, port = 7860): string {
 // =============================================================================
 
 const PRESETS = [
-  { id: 'reels-4k', label: 'Reels 4K', emoji: '📱', desc: '9:16 Vertical', model: DEFAULT_MODEL, scale: '2x', cq: '19' },
-  { id: 'cinema-4k', label: 'Cinema 4K', emoji: '🎬', desc: '16:9 Wide', model: DEFAULT_MODEL, scale: '2x', cq: '18' },
-  { id: 'photo-crisp', label: 'Photo Sharp', emoji: '📷', desc: 'Ultra Detail', model: 'RealESRGAN_x4plus.pth', scale: '4x', cq: '16' },
-  { id: 'anime', label: 'Anime', emoji: '🎌', desc: '2D Artwork', model: 'RealESRGAN_x4plus_anime_6B.pth', scale: '2x', cq: '20' },
+  { id: 'reels-4k', label: '4K Reels', emoji: '📱', desc: 'Auto → 4K vertical', model: DEFAULT_MODEL, scale: '4k', cq: '19' },
+  { id: 'cinema-4k', label: '4K Cinema', emoji: '🎬', desc: 'Auto → 4K wide', model: DEFAULT_MODEL, scale: '4k', cq: '18' },
+  { id: 'photo-crisp', label: 'Photo 4K', emoji: '📷', desc: 'Ultra detail', model: 'RealESRGAN_x4plus.pth', scale: '4k', cq: '16' },
+  { id: 'anime', label: 'Anime 4K', emoji: '🎌', desc: '2D artwork', model: 'RealESRGAN_x4plus_anime_6B.pth', scale: '4k', cq: '20' },
 ];
 
 // =============================================================================
@@ -84,23 +85,60 @@ export default function App() {
 
   const BASE_URL = useServerUrl(serverIp);
 
-  // ── Media picker ──────────────────────────────────────────────────────────
+  // ── Media picker + real upload ────────────────────────────────────────────
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
+  const [uploading, setUploading] = useState(false);
 
   const pickMedia = useCallback(async () => {
     const perm = await requestMediaPermission();
     if (!perm.granted) {
-      Alert.alert('Permission Required', 'Please allow access to Media Library.');
+      Alert.alert('Permission Required', 'Please allow access to your Photos to pick a file.');
       return;
     }
-    // Expo MediaLibrary: pick from camera roll
-    // Note: We'll do a simple assets query and pick first video for demo
-    Alert.alert(
-      'Select Media',
-      'Pick a video or image from your Photos app, then tap Upload.',
-      [{ text: 'OK' }]
-    );
-  }, [requestMediaPermission]);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,   // videos + images
+      quality: 1,
+      allowsMultipleSelection: false,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const asset = result.assets[0];
+    await uploadAndUpscale(asset.uri, asset.fileName || 'upload');
+  }, [requestMediaPermission, requestMediaPermission]);
+
+  // Upload a local file to the PC and start a 4K job.
+  const uploadAndUpscale = useCallback(async (uri: string, name: string) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      // React Native FormData accepts a {uri,name,type} file object.
+      form.append('file', {
+        uri,
+        name,
+        type: /\.(png|jpe?g|webp|bmp|tiff)$/i.test(name) ? 'image/*' : 'video/*',
+      } as any);
+      form.append('model', selectedPreset.model);
+      form.append('scale', selectedPreset.scale);   // '4k' = true 4K target
+      form.append('cq', selectedPreset.cq);
+      form.append('tile', '-1');                    // auto tile
+      form.append('denoise', 'auto');               // auto compression cleanup
+
+      const res = await fetch(`${BASE_URL}/api/upscale`, { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok || !data.job_id) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      if (data.status === 'queued' && data.position > 1) {
+        Alert.alert('Queued', `Job added at position ${data.position}. It will start automatically.`);
+      } else {
+        Alert.alert('Upscaling started 🚀', `${name} → 4K. Track progress in the Queue tab.`);
+      }
+      setTab('queue');
+    } catch (e: any) {
+      Alert.alert('Upload failed', String(e?.message || e));
+    } finally {
+      setUploading(false);
+    }
+  }, [BASE_URL, selectedPreset]);
 
   // ── Server connect ─────────────────────────────────────────────────────────
   const connectToServer = useCallback(async (ip: string) => {
@@ -141,16 +179,22 @@ export default function App() {
     } catch {}
   }, [BASE_URL]);
 
-  // ── Download result ────────────────────────────────────────────────────────
+  // ── Download result (zip, contains the real output file) ──────────────────
   const downloadResult = useCallback(async (jobId: string, filename: string) => {
-    const downloadUrl = `${BASE_URL}/api/download/${jobId}`;
-    const dest = `${FileSystem.documentDirectory}${filename}`;
-    const res = await FileSystem.downloadAsync(downloadUrl, dest);
-    if (res.status === 200) {
-      await MediaLibrary.saveToLibraryAsync(res.uri);
-      Alert.alert('Downloaded! ✅', `"${filename}" saved to Photos.`);
-    } else {
-      Alert.alert('Download failed', 'Could not fetch the file.');
+    const zipName = filename.replace(/\.[^.]+$/, '') + '.zip';
+    const downloadUrl = `${BASE_URL}/api/download-zip/${jobId}`;
+    const dest = `${FileSystem.documentDirectory}${zipName}`;
+    try {
+      const res = await FileSystem.downloadAsync(downloadUrl, dest);
+      if (res.status === 200) {
+        // Save the archive to Files/Photos; user can unzip to get the 4K file.
+        await MediaLibrary.saveToLibraryAsync(res.uri);
+        Alert.alert('Downloaded ✅', `"${zipName}" saved. It contains your 4K ${/\.(png|jpe?g|webp)$/i.test(filename) ? 'image' : 'video'}.`);
+      } else {
+        Alert.alert('Download failed', `Server returned ${res.status}.`);
+      }
+    } catch (e: any) {
+      Alert.alert('Download failed', String(e?.message || e));
     }
   }, [BASE_URL]);
 

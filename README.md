@@ -9,7 +9,20 @@
 
 **ReelFrame** is a professional-grade, fully local AI super-resolution pipeline for creators and video editors. Upscale vertical reels, shorts, cinematic footage, and photos to pristine 4K on your own GPU — zero cloud, zero subscriptions.
 
-Uses **Real-ESRGAN** + **NVIDIA NVENC hardware acceleration** through a zero-disk streaming pipeline. Available as a **Web Dashboard**, **Windows Native App**, and **iOS Mobile Companion**.
+Uses **Real-ESRGAN** for AI super-resolution with a zero-disk streaming pipeline, and
+auto-selects the fastest working video encoder (**H.264**, the most compatible format —
+plays in every player and browser without extra codecs). Available as a **Web Dashboard**,
+**Windows Native App**, and **iOS Mobile Companion**.
+
+> **v2 — Reliability & True-4K update**
+> - Fixed the *"app won't open — black window flashes then closes"* crash (console encoding).
+> - Fixed video jobs **hanging forever** mid-encode (deadlock-proof pipeline).
+> - Fixed outputs that played as **audio-only** (now always H.264).
+> - Added a real **4K target mode** that adapts to any input size/aspect ratio.
+> - Added **edge-preserving deblocking** so compressed sources don't produce block artifacts.
+> - Jobs now run **one at a time** with auto tile sizing — typically **10–30× faster** than before.
+> - History downloads a ready-to-use **.zip** straight to your Downloads folder.
+
 
 ---
 
@@ -49,69 +62,117 @@ Uses **Real-ESRGAN** + **NVIDIA NVENC hardware acceleration** through a zero-dis
 
 | Feature | Description |
 |---|---|
-| 🧠 **AI Super-Resolution** | Real-ESRGAN models (SRVGGNet + RRDBNet) — photo-realistic 4K upscaling |
-| ⚡ **GPU Accelerated** | CUDA fp16 inference, threaded pipe, >95% GPU utilization |
-| 🛡️ **4GB VRAM Safe** | Smart overlapping tiling — zero CUDA OOM on RTX 3050/4GB cards |
+| 🧠 **AI Super-Resolution** | Real-ESRGAN models (SRVGGNet + RRDBNet) — photo-realistic upscaling |
+| 🎯 **True 4K Target** | Pick "4K" and any source becomes genuine 4K UHD (auto-adapts aspect ratio) |
+| ⚡ **GPU Accelerated** | CUDA fp16 inference, threaded pipe; auto CPU fallback when NVENC is unavailable |
+| 🛡️ **4GB VRAM Safe** | Auto tile sizing — full-frame for small sources, tiling only when needed (no OOM) |
 | 🎬 **Video + Photo** | MP4, MOV, MKV, WebM, PNG, JPG, WebP — all in one engine |
-| 📂 **Batch Processing** | Drop a whole folder, upscale everything in one command |
-| 🔊 **Bit-Perfect Audio** | Audio stream copied without re-encoding |
-| 🌐 **Web Dashboard** | Live progress, presets, history, real-time queue |
-| 🖥️ **Windows Desktop App** | Native WebView2 window (no browser needed) |
+| 🔧 **Compression Cleanup** | Edge-preserving deblocking stops block artifacts on compressed sources (WhatsApp etc.) |
+| 🎞️ **Universal Playback** | Outputs H.264 by default — plays natively on Windows, browsers, and phones |
+| 📂 **Batch Processing** | Drop a whole folder, upscale everything (serialized for max throughput) |
+| 🔊 **Audio Preserved** | Audio re-encoded to AAC so the track always plays |
+| 🌐 **Web Dashboard** | Live progress, real-time queue, history, system info |
+| 🗜️ **Zip Downloads** | History downloads a `.zip` (original-format file inside) to your Downloads folder |
+| 🖥️ **Windows Desktop App** | Native WebView2 window + crash log & error dialog (never fails silently) |
 | 📱 **iOS Companion** | Control ReelFrame from your iPhone via WiFi |
-| 🎛️ **Social Presets** | Reels 4K, Cinema 4K, Photo Sharp, Anime — one click |
-| 🔧 **Denoise & Sharpen** | Pre-upscale denoising + post-upscale unsharp mask |
+| 🔧 **Denoise & Sharpen** | Pre-upscale cleanup + post-upscale unsharp mask |
 
 ---
 
-## 💻 Hardware Requirements
+## 💻 Hardware & OS Requirements
 
 | Component | Minimum | Recommended |
 |---|---|---|
-| **GPU** | NVIDIA 4GB VRAM (RTX 3050 Laptop), CUDA 11.8+ | RTX 3060 / 4060 Ti / 4090 |
+| **GPU** | NVIDIA 4 GB VRAM (RTX 3050), CUDA 11.8+ — *or* Apple Silicon (MPS) / CPU | RTX 3060 / 4060 Ti / 4090 |
 | **RAM** | 8 GB | 16 GB+ |
-| **OS** | Windows 10/11 64-bit | Windows 11 |
+| **OS** | Windows 10/11, macOS 12+, or Linux | Windows 11 / macOS Sonoma |
 | **Python** | 3.11+ | 3.13 |
+
+> **GPU acceleration:** NVIDIA CUDA is fastest. On macOS the Metal/MPS backend is used.
+> NVENC hardware encoding is used automatically when available; otherwise the app falls
+> back to a CPU encoder (`libx264`) so it always works — just slower.
 
 ---
 
-## 🚀 Quick Start — Windows
+## 🚀 Quick Start
 
-### Option 1: Web Dashboard (Recommended)
+### Windows
+
 ```batch
 setup.bat        ← first-time setup (installs everything)
-run_gui.bat      ← opens http://127.0.0.1:7860 in your browser
+run_gui.bat      ← web dashboard  (http://127.0.0.1:7860)
+run_app.bat      ← native desktop window
+build_desktop.bat ← build dist\ReelFrame\ReelFrame.exe
 ```
 
-### Option 2: Native Desktop App
+### macOS / Linux
+
+```bash
+bash setup.sh    # first-time setup
+bash run_gui.sh  # web dashboard (http://127.0.0.1:7860)
+bash run_app.sh  # native window (pywebview)
+```
+
+### CLI (any OS)
+
+```bash
+.venv/bin/python upscale.py input.mp4 --target 4k     # macOS/Linux
+.venv\Scripts\python.exe upscale.py input.mp4 --target 4k   # Windows
+```
+
+### CLI (any OS)
+
+```bash
+.venv/bin/python upscale.py input.mp4 --target 4k     # macOS/Linux
+.venv\Scripts\python.exe upscale.py input.mp4 --target 4k   # Windows
+```
+
+---
+
+## 📦 Build an Installable App (Windows / macOS / Linux)
+
+Turn ReelFrame into a real double-click application.
+
+### Windows — installer `.exe`
 ```batch
-setup.bat        ← first-time setup
-run_app.bat      ← launches as a native Windows window
+build_windows_installer.bat
 ```
+Produces:
+- `dist\ReelFrame\ReelFrame.exe` — portable app (run directly)
+- `installer\output\ReelFrame-Setup-2.0.0.exe` — **installer** (Start Menu + Desktop shortcut + uninstaller)
 
-### Option 3: CLI
-```powershell
-# Activate venv
-.venv\Scripts\activate
+> Requires [Inno Setup](https://jrsoftware.org/isdl.php): `winget install JRSoftware.InnoSetup`
 
-# Upscale a reel (1080p → 4K vertical)
-python upscale.py input.mp4
-
-# Upscale a photo
-python upscale.py photo.png -o photo_4k.png
-
-# Batch upscale folder
-python upscale.py "D:\Reels\" -o "D:\Reels\4K"
-
-# Custom quality + denoise + sharpen
-python upscale.py clip.mp4 --cq 18 --denoise 0.3 --sharpen 0.5
+### macOS — `ReelFrame.app`
+```bash
+bash build_macos.sh
 ```
+Produces `dist/ReelFrame.app` — drag it into `/Applications`.
+(First launch: right-click → **Open** to allow an unsigned app.)
+
+### Linux — bundle (+ optional AppImage)
+```bash
+bash build_linux.sh
+```
+Produces `dist/ReelFrame/ReelFrame`. See the AppImage section inside the script to
+package it as a single `.AppImage` file.
+
+> Each platform builds on its **own OS** (PyInstaller does not cross-compile).
+> The build scripts auto-install the platform's webview backend (WebView2 / Cocoa / GTK).
+
+### iOS companion
+```bash
+cd ios-app
+npm install
+npx expo start     # scan the QR with Expo Go on your iPhone
+```
+See [IOS_COMPANION.md](IOS_COMPANION.md).
 
 ---
 
 ## 📱 iOS Companion App
 
 Control ReelFrame from your iPhone on the same WiFi:
-
 1. Run `run_app.bat` — note the **Network IP** displayed
 2. Install [**Expo Go**](https://apps.apple.com/app/expo-go/id982107779) on iPhone
 3. Open `ios-app/`, run `npm install && npx expo start`
@@ -128,14 +189,15 @@ See [IOS_COMPANION.md](IOS_COMPANION.md) for full setup guide.
 |---|---|---|
 | `input` | *required* | Video/image file or directory |
 | `-o` / `--output` | `[name]_4K.[ext]` | Output path |
+| `--target` | *(none)* | **`4k` / `2k` / `1080p`** — auto-adapts any input/aspect ratio to this size. Overrides `--downscale` |
 | `--model` | `realesr-general-x4v3.pth` | Model weights (in `./models/`) |
 | `--downscale` | `0.5` | Post-SR scale (0.5 + x4 = 2× output) |
-| `--tile` | `512` | Tile size for VRAM safety (`0` = disabled) |
-| `--cq` | `20` | NVENC quality (16=best, 28=smallest) |
-| `--preset` | `p4` | NVENC speed (`p1`=fastest … `p7`=best) |
-| `--encoder` | `hevc_nvenc` | `hevc_nvenc`, `h264_nvenc`, `av1_nvenc`, `libx265` |
+| `--tile` | `-1` (auto) | Tile size (`-1` auto, `0` full-frame, e.g. `512` for very low VRAM) |
+| `--cq` | `20` | Encoder quality CQ/CRF (lower = better, 18–23 typical) |
+| `--preset` | `p4` | Encoder preset `p1` (fastest) … `p7` (best) |
+| `--encoder` | `auto` | `auto`, `h264_nvenc`, `hevc_nvenc`, `av1_nvenc`, `libx264`, `libx265` |
 | `--format` | `mp4` | Output container / image format |
-| `--denoise` | `0.0` | Pre-upscale Gaussian blur (0–1) |
+| `--denoise` | `0.0` | Pre-upscale cleanup strength (0–1) — auto-detects compressed sources |
 | `--sharpen` | `0.0` | Post-upscale unsharp mask (0–2) |
 | `--fp32` | off | Force float32 on GPU (slower, more precise) |
 | `--verbose` | off | Show full ffmpeg output |
@@ -163,23 +225,36 @@ python download_models.py default   # download default only (~5 MB)
 
 ```
 ReelFrame/
-├── upscale.py          — Core AI engine (video + image + batch)
+├── upscale.py          — Core AI engine (video + image + batch + 4K target)
 ├── gui.py              — FastAPI web server + REST API
-├── desktop_app.py      — Windows native desktop app (WebView2)
+├── desktop_app.py      — Windows native desktop app (WebView2, crash-safe)
+├── ReelFrame.spec      — PyInstaller build config (Windows/Linux, windowed, icon)
+├── ReelFrame-macos.spec— PyInstaller build config (macOS .app bundle)
+├── installer/
+│   └── ReelFrame.iss   — Inno Setup script → ReelFrame-Setup.exe
+├── make_icon.py        — Generates the brand .ico/.png
 ├── web/
-│   └── index.html      — Web dashboard UI (4 tabs + history + queue)
-├── ios-app/
-│   ├── App.tsx         — React Native iOS companion app
-│   ├── app.json        — Expo config + iOS permissions
-│   └── package.json    — RN dependencies
+│   ├── index.html      — Web dashboard UI (4 tabs + history + live queue)
+│   ├── icon.ico        — App icon (also served as favicon)
+│   └── icon.png        — App icon (PNG)
+├── ios-app/            — React Native iOS companion (Expo)
 ├── models/             — AI model weights (.pth)
-├── outputs/            — Processed 4K output files
-├── download_models.py  — Model weight downloader
-├── setup.bat           — Automated Windows setup
-├── run_gui.bat         — Start web dashboard
-├── run_app.bat         — Start native desktop app
-└── download_models.bat — Download model weights (Windows)
+├── outputs/            — Processed output files (writable data dir)
+├── test_startup_safety.py — Regression tests (encoding + filename safety)
+├── test_api_e2e.py     — End-to-end API test suite
+├── setup.bat / .sh     — Automated setup (Windows / macOS+Linux)
+├── run_gui.bat / .sh   — Start web dashboard
+├── run_app.bat / .sh   — Start native desktop app
+├── build_desktop.bat   — Build portable Windows app
+├── build_windows_installer.bat — Build portable app + installer
+├── build_macos.sh      — Build macOS .app
+├── build_linux.sh      — Build Linux bundle (+ optional AppImage)
+└── download_models.py  — Model weight downloader
 ```
+
+> **Where files are written:** running from source, outputs go to `./outputs/`.
+> The packaged desktop app writes to `%LOCALAPPDATA%\ReelFrame\` (outputs, uploads,
+> history, logs) so it never writes inside its own install folder.
 
 ---
 
