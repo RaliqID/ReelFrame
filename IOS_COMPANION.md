@@ -1,6 +1,6 @@
 # iOS Mobile Companion — ReelFrame
 
-> ⚠️ **For iOS Support**: ReelFrame runs the AI processing on your **Windows PC** (GPU-powered). The iOS app connects to the same WiFi network and uses your PC as the backend engine.
+> ⚠️ **For iOS Support**: ReelFrame runs the AI processing on your **PC / Mac** (GPU-powered). The iOS app connects over WiFi and uses that machine as the backend engine.
 
 ## How It Works
 
@@ -8,7 +8,7 @@
 iPhone / iPad (iOS App)
       │  WiFi (same network)
       ▼
-[ReelFrame Server on Windows PC] ──▶ RTX 3050 GPU ──▶ 4K Output
+[ReelFrame Server on PC / Mac] ──▶ GPU ──▶ 4K Output ──▶ .zip back to iPhone
 ```
 
 ---
@@ -16,16 +16,16 @@ iPhone / iPad (iOS App)
 ## iOS Companion App Architecture
 
 ReelFrame's iOS companion is a **React Native + Expo** app that:
-1. Discovers the ReelFrame server on local WiFi
-2. Lets you browse and select videos/photos from iOS Camera Roll
-3. Queues upscale jobs on the PC GPU
-4. Downloads the finished 4K file directly to Photos
+1. Discovers the ReelFrame server on local WiFi (enter the IP shown in the desktop app)
+2. Browses and selects videos/photos from iOS Camera Roll (`expo-image-picker`)
+3. Uploads the file and queues a **4K** upscale job on the host GPU
+4. Polls live progress, and downloads the finished file as a **.zip** (saved to Photos/Files)
 
 ### App Tech Stack
-- **React Native + Expo** (cross-platform, no Mac needed for dev)
-- **react-native-vision-camera** for live preview
-- **expo-media-library** for Camera Roll access
-- **react-native-fs** for file transfer
+- **React Native + Expo** (works with Expo Go — no Mac required to run the companion)
+- **expo-image-picker** — pick videos/photos from the Camera Roll
+- **expo-media-library** — save downloads back to Photos
+- **expo-file-system** — fetch the finished `.zip`
 
 ---
 

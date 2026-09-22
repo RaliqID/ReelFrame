@@ -29,6 +29,12 @@
           "photosPermission": "Allow ReelFrame to access your photos and videos.",
           "savePhotosPermission": "Allow ReelFrame to save upscaled 4K files to your Photos."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow ReelFrame to select a video or photo to upscale to 4K."
+        }
       ]
     ]
   }

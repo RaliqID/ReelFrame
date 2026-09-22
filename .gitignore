@@ -1,28 +1,38 @@
-# Python
+# Virtual environment
+.venv/
+venv/
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec.bak
+
+# Compiled executables at repo root (build output, not source)
+/ReelFrame.exe
+/ReelFrame
+*.pkg
+
+# Installer output
+installer/output/
+
+# Python caches
 __pycache__/
 *.py[cod]
 *$py.class
-*.egg-info/
-.venv/
-venv/
-env/
 
-# Project artifacts
-input/
-output/
+# App runtime data (outputs, uploads, logs, history)
 outputs/
 temp_uploads/
 logs/
-build/
-dist/
-*.exe
-models/*.pth
-models/*.onnx
-models/*.engine
+history.json
 
-# Editors / OS
-.vscode/
-.idea/
-.DS_Store
+# Node / Expo
+ios-app/node_modules/
+ios-app/.expo/
+ios-app/dist/
+npm-debug.log*
+
+# OS junk
 Thumbs.db
-*.swp
+.DS_Store
+desktop.ini
